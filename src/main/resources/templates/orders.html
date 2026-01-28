@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>FruitMart | Orders</title>
+    <style>
+        body { font-family: Arial; background: #f6fff7; padding: 30px; }
+        .order {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        h3 { color: #27ae60; }
+    </style>
+</head>
+
+<body>
+
+<h2>📦 Order History</h2>
+
+<div th:if="${orders.size() == 0}">
+    <p>No orders placed yet.</p>
+</div>
+
+<div class="order" th:each="order : ${orders}">
+    <h3>Order ID: <span th:text="${order.id}"></span></h3>
+    <p>Date: <span th:text="${order.date}"></span></p>
+    <p><b>Total:</b> ₹<span th:text="${order.total}"></span></p>
+
+    <ul>
+        <li th:each="i : ${order.items}">
+            <span th:text="${i.name}"></span> -
+            <span th:text="${i.quantity}"></span>
+            <span th:text="${i.unit}"></span>
+        </li>
+    </ul>
+</div>
+
+<a href="/dashboard">⬅ Back to Dashboard</a>
+
+</body>
+</html>

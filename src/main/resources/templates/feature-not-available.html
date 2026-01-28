@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Feature Not Available</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #e8f5e9, #f1f8e9);
+            margin: 0;
+            padding: 0;
+        }
+
+        .box {
+            width: 420px;
+            margin: 120px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+
+        h2 {
+            color: #2ecc71;
+            margin-bottom: 15px;
+        }
+
+        p {
+            color: #555;
+            font-size: 16px;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #2ecc71;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+
+        a:hover {
+            background: #27ae60;
+        }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2 th:text="${featureName}">Feature</h2>
+    <p th:text="${message}">
+        This feature is not available right now.
+    </p>
+
+    <a href="/dashboard">Back to Dashboard</a>
+</div>
+
+</body>
+</html>

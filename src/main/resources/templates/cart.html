@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>FruitMart | Cart</title>
+    <style>
+        body { font-family: Arial; background: #f6fff7; padding: 30px; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: center; }
+        th { background: #2ecc71; color: white; }
+        button {
+            background: #27ae60;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            cursor: pointer;
+        }
+        .remove { color: red; text-decoration: none; }
+        .total { margin-top: 20px; font-size: 20px; font-weight: bold; }
+    </style>
+</head>
+
+<body>
+
+<h2>🛒 Your Cart</h2>
+
+<table>
+    <tr>
+        <th>Fruit</th>
+        <th>Quantity</th>
+        <th>Unit</th>
+        <th>Price</th>
+        <th>Total</th>
+        <th>Actions</th>
+    </tr>
+
+    <tr th:each="item,iter : ${cart}">
+        <td th:text="${item.name}"></td>
+
+        <td>
+            <form action="/update-cart" method="post">
+                <input type="hidden" name="index" th:value="${iter.index}">
+                <input type="number" name="quantity"
+                       th:value="${item.quantity}" min="1" style="width:60px;">
+                <button type="submit">Update</button>
+            </form>
+        </td>
+
+        <td th:text="${item.unit}"></td>
+        <td th:text="${item.price}"></td>
+        <td th:text="${item.total}"></td>
+
+        <td>
+            <a class="remove" th:href="@{'/remove-item/' + ${iter.index}}">Remove</a>
+        </td>
+    </tr>
+</table>
+
+<div class="total">
+    Grand Total: ₹<span th:text="${grandTotal}"></span>
+</div>
+
+<form action="/place-order" method="post">
+    <button type="submit">Place Order</button>
+</form>
+
+<br>
+<a href="/dashboard">⬅ Continue Shopping</a>
+
+</body>
+</html>
