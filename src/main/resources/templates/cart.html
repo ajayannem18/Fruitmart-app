@@ -1,21 +1,67 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>FruitMart | Cart</title>
+    <title>Your Cart</title>
+
     <style>
-        body { font-family: Arial; background: #f6fff7; padding: 30px; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: center; }
-        th { background: #2ecc71; color: white; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f1f1f1;
+        }
+
         button {
-            background: #27ae60;
-            color: white;
             padding: 6px 12px;
             border: none;
+            border-radius: 5px;
             cursor: pointer;
+            background: #4caf50;
+            color: white;
         }
-        .remove { color: red; text-decoration: none; }
-        .total { margin-top: 20px; font-size: 20px; font-weight: bold; }
+
+        .danger {
+            background: #e53935;
+        }
+
+        .total-box {
+            margin-top: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .actions {
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        a {
+            text-decoration: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+        }
+
+        .shop { background: #2196f3; }
     </style>
 </head>
 
@@ -23,48 +69,85 @@
 
 <h2>🛒 Your Cart</h2>
 
-<table>
+<table th:if="${items.size() > 0}">
     <tr>
-        <th>Fruit</th>
-        <th>Quantity</th>
-        <th>Unit</th>
+        <th>Item</th>
         <th>Price</th>
+        <th>Qty</th>
         <th>Total</th>
-        <th>Actions</th>
+        <th>Action</th>
     </tr>
 
-    <tr th:each="item,iter : ${cart}">
-        <td th:text="${item.name}"></td>
+    <tr th:each="item : ${items}">
+        <td th:text="${item.fruitName}"></td>
+        <td>₹ <span th:text="${item.price}"></span></td>
 
         <td>
-            <form action="/update-cart" method="post">
-                <input type="hidden" name="index" th:value="${iter.index}">
-                <input type="number" name="quantity"
-                       th:value="${item.quantity}" min="1" style="width:60px;">
-                <button type="submit">Update</button>
-            </form>
+            <button th:onclick="|updateCart(${item.id}, 'dec')|">-</button>
+            <b id="qty-[[${item.id}]]" th:text="${item.quantity}"></b>
+            <button th:onclick="|updateCart(${item.id}, 'inc')|">+</button>
         </td>
 
-        <td th:text="${item.unit}"></td>
-        <td th:text="${item.price}"></td>
-        <td th:text="${item.total}"></td>
+        <td>
+            ₹ <span class="item-total"
+                    id="total-[[${item.id}]]"
+                    th:text="${item.price * item.quantity}">
+            </span>
+        </td>
 
         <td>
-            <a class="remove" th:href="@{'/remove-item/' + ${iter.index}}">Remove</a>
+            <a th:href="@{/cart/remove/{id}(id=${item.id})}" class="danger">Remove</a>
         </td>
     </tr>
 </table>
 
-<div class="total">
-    Grand Total: ₹<span th:text="${grandTotal}"></span>
+<p th:if="${items.size() == 0}">Your cart is empty 🛍️</p>
+
+<div class="total-box">
+    Grand Total: ₹ <span id="grandTotal" th:text="${total}"></span>
 </div>
 
-<form action="/place-order" method="post">
-    <button type="submit">Place Order</button>
-</form>
+<div class="actions">
+    <a href="/cart/clear" class="danger">Clear Cart</a>
+    <a href="/dashboard" class="shop">⬅ Shop More</a>
+</div>
 
-<br>
-<a href="/dashboard">⬅ Continue Shopping</a>
+<div style="margin-top:20px; background:white; padding:15px; border-radius:10px;">
+    <h3>🚚 Delivery Address (COD)</h3>
+    <form action="/place-order" method="post">
+        <input name="address" placeholder="Address" required><br><br>
+        <input name="phone" placeholder="Phone" required><br><br>
+        <input name="pincode" placeholder="Pincode" required><br><br>
+        <button type="submit">Place Order</button>
+    </form>
+</div>
+
+<script>
+function updateCart(id, action) {
+    fetch('/cart/update-ajax', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `id=${id}&action=${action}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success) return;
+
+        document.getElementById('qty-' + id).innerText = data.quantity;
+        document.getElementById('total-' + id).innerText = data.itemTotal;
+
+        recalcGrandTotal();
+    });
+}
+
+function recalcGrandTotal() {
+    let sum = 0;
+    document.querySelectorAll('.item-total').forEach(el => {
+        sum += parseInt(el.innerText);
+    });
+    document.getElementById('grandTotal').innerText = sum;
+}
+</script>
 
 </body>
 </html>

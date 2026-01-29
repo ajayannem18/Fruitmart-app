@@ -1,16 +1,105 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>FruitMart | Profile</title>
+    <title>Profile</title>
+
+    <style>
+        body {
+            background:#f5f7fb;
+            font-family:Arial, sans-serif;
+            padding:20px;
+        }
+
+        .card {
+            background:white;
+            padding:18px;
+            border-radius:10px;
+            margin-bottom:20px;
+            box-shadow:0 6px 18px rgba(0,0,0,0.08);
+        }
+
+        .btn {
+            padding:8px 14px;
+            border-radius:6px;
+            text-decoration:none;
+            color:white;
+            font-size:14px;
+            display:inline-block;
+            margin-right:8px;
+        }
+
+        .shop { background:#2196f3; }
+        .danger { background:#e53935; }
+
+        /* 🔴 MESSAGE */
+        .message {
+            background:#fdecea;
+            color:#b71c1c;
+            padding:12px 16px;
+            border-radius:6px;
+            margin-bottom:20px;
+            animation:fadeOut 4s forwards;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity:1; }
+            70% { opacity:1; }
+            100% { opacity:0; }
+        }
+
+        ul {
+            padding-left:18px;
+        }
+    </style>
 </head>
+
 <body>
 
-<h2>👤 My Profile</h2>
+<!-- 🔴 MESSAGE (NO POPUP) -->
+<div th:if="${param.msg}" class="message"
+     th:text="${param.msg}"></div>
 
-<p><b>Name:</b> <span th:text="${user.name}"></span></p>
-<p><b>Email:</b> <span th:text="${user.email}"></span></p>
+<!-- 👤 USER DETAILS -->
+<div class="card">
+    <h2>👤 Profile</h2>
+    <p><b>Name:</b> <span th:text="${user.name}"></span></p>
+    <p><b>Email:</b> <span th:text="${user.email}"></span></p>
+</div>
 
-<a href="/dashboard">⬅ Back to Dashboard</a>
+<a href="/dashboard" class="btn shop">⬅ Shop More</a>
+<a href="/orders/clear" class="btn danger">
+    Clear All Orders
+</a>
+
+<h3>📦 Order History</h3>
+
+<div th:if="${orders.size() == 0}" class="card">
+    No orders yet 😔
+</div>
+
+<div th:each="order : ${orders}" class="card">
+
+    <p><b>Order ID:</b> <span th:text="${order.id}"></span></p>
+    <p><b>Date:</b> <span th:text="${order.orderDateTime}"></span></p>
+    <p><b>Status:</b> <span th:text="${order.status}"></span></p>
+
+    <ul>
+        <li th:each="item : ${order.items}">
+            <span th:text="${item.fruitName}"></span>
+            × <span th:text="${item.quantity}"></span>
+            = ₹<span th:text="${item.total}"></span>
+        </li>
+    </ul>
+
+    <p>
+        <b>Total:</b> ₹<span th:text="${order.total}"></span>
+    </p>
+
+    <a th:href="@{/order/delete/{id}(id=${order.id})}"
+       class="btn danger">
+       Delete This Order
+    </a>
+</div>
 
 </body>
 </html>

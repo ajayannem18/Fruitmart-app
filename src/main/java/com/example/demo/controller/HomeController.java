@@ -1,44 +1,56 @@
 package com.example.demo.controller;
 
-import com.example.demo.entity.User;
-import com.example.demo.repository.UserRepository;
+import com.example.demo.entity.*;
+import com.example.demo.repository.*;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 public class HomeController {
 
-    private final UserRepository userRepository;
+    private final UserRepository userRepo;
+    private final CartItemRepository cartRepo;
+    private final OrderRepository orderRepo;
+    private final OrderItemRepository orderItemRepo;
 
-    public HomeController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public HomeController(UserRepository userRepo,
+                          CartItemRepository cartRepo,
+                          OrderRepository orderRepo,
+                          OrderItemRepository orderItemRepo) {
+        this.userRepo = userRepo;
+        this.cartRepo = cartRepo;
+        this.orderRepo = orderRepo;
+        this.orderItemRepo = orderItemRepo;
     }
 
-    /* ================= HOME ================= */
-    @GetMapping("/")
-    public String home() {
-        return "home";
+    /* ================= LANDING / HOME ================= */
+
+    @GetMapping({"/", "/home"})
+    public String home(Model model) {
+        model.addAttribute("fruits", fruits());
+        return "home";   // 🔥 public landing page
     }
 
     /* ================= LOGIN ================= */
+
     @GetMapping("/login")
     public String login() {
         return "login";
     }
 
     @PostMapping("/login")
-    public String loginUser(
-            @RequestParam String email,
-            @RequestParam String password,
-            Model model,
-            HttpSession session) {
+    public String doLogin(@RequestParam String email,
+                          @RequestParam String password,
+                          HttpSession session,
+                          Model model) {
 
-        User user = userRepository.findByEmail(email);
-
+        User user = userRepo.findByEmail(email);
         if (user == null || !user.getPassword().equals(password)) {
             model.addAttribute("error", "Invalid email or password");
             return "login";
@@ -49,134 +61,222 @@ public class HomeController {
     }
 
     /* ================= REGISTER ================= */
+
     @GetMapping("/register")
     public String register() {
         return "register";
     }
 
     @PostMapping("/register")
-    public String registerUser(
-            @RequestParam String name,
-            @RequestParam String email,
-            @RequestParam String password,
-            @RequestParam String confirmPassword,
-            Model model,
-            HttpSession session) {
+    public String doRegister(@RequestParam String name,
+                             @RequestParam String email,
+                             @RequestParam String password,
+                             HttpSession session,
+                             Model model) {
 
-        if (!password.equals(confirmPassword)) {
-            model.addAttribute("error", "Passwords do not match");
+        if (userRepo.findByEmail(email) != null) {
+            model.addAttribute("error", "Email already exists");
             return "register";
         }
 
-        if (userRepository.existsByEmail(email)) {
-            model.addAttribute("error", "User already exists");
-            return "register";
-        }
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(password);
+        userRepo.save(user);
 
-        User user = new User(name, email, password);
-        userRepository.save(user);
+        // ✅ auto login after register
         session.setAttribute("loggedUser", user);
-
         return "redirect:/dashboard";
     }
 
     /* ================= DASHBOARD ================= */
+
     @GetMapping("/dashboard")
     public String dashboard(Model model, HttpSession session) {
 
-        // TEMP: allow viewing dashboard without login
-        model.addAttribute("user", session.getAttribute("loggedUser"));
-        model.addAttribute("fruits", getFruits());
+        User user = (User) session.getAttribute("loggedUser");
+        if (user == null) return "redirect:/login";
+
+        int cartCount = cartRepo.findByUser(user)
+                .stream()
+                .mapToInt(CartItem::getQuantity)
+                .sum();
+
+        model.addAttribute("fruits", fruits());
+        model.addAttribute("username", user.getName());
+        model.addAttribute("cartCount", cartCount);
 
         return "dashboard";
     }
 
     /* ================= ADD TO CART ================= */
-    @PostMapping("/add-to-cart")
-    public String addToCart(HttpSession session) {
 
-        if (session.getAttribute("loggedUser") == null) {
-            return "redirect:/login";
+    @GetMapping("/add-to-cart")
+    @ResponseBody
+    public Map<String, Object> addToCart(@RequestParam String name,
+                                         @RequestParam int qty,
+                                         HttpSession session) {
+
+        User user = (User) session.getAttribute("loggedUser");
+
+        // ❗ Redirect if not logged in
+        if (user == null) {
+            return Map.of("redirect", "/login");
         }
-        return "redirect:/cart";
+
+        Map<String, Object> fruit = fruits().stream()
+                .filter(f -> f.get("name").equals(name))
+                .findFirst()
+                .orElseThrow();
+
+        CartItem item = cartRepo.findByUserAndFruitName(user, name)
+                .orElse(new CartItem(
+                        name,
+                        (int) fruit.get("price"),
+                        (String) fruit.get("unit"),
+                        0,
+                        user
+                ));
+
+        item.setQuantity(item.getQuantity() + qty);
+        cartRepo.save(item);
+
+        return Map.of("success", true);
     }
 
-    /* ================= CART (DISABLED) ================= */
+    /* ================= CART ================= */
+
     @GetMapping("/cart")
-    public String cartDisabled(Model model) {
-        model.addAttribute("feature", "Cart");
-        return "feature-not-available";
+    public String cart(Model model, HttpSession session) {
+
+        User user = (User) session.getAttribute("loggedUser");
+        if (user == null) return "redirect:/login";
+
+        List<CartItem> items = cartRepo.findByUser(user);
+        int total = items.stream()
+                .mapToInt(i -> i.getPrice() * i.getQuantity())
+                .sum();
+
+        model.addAttribute("items", items);
+        model.addAttribute("total", total);
+        return "cart";
     }
 
-    /* ================= ORDERS (DISABLED) ================= */
-    @GetMapping("/orders")
-    public String ordersDisabled(Model model) {
-        model.addAttribute("feature", "Orders");
-        return "feature-not-available";
+    /* ================= PLACE ORDER ================= */
+
+    @PostMapping("/place-order")
+    public String placeOrder(@RequestParam String address,
+                             @RequestParam String phone,
+                             @RequestParam String pincode,
+                             HttpSession session) {
+
+        User user = (User) session.getAttribute("loggedUser");
+        if (user == null) return "redirect:/login";
+
+        List<CartItem> cartItems = cartRepo.findByUser(user);
+        if (cartItems.isEmpty()) return "redirect:/cart";
+
+        Order order = new Order();
+        order.setUser(user);
+        order.setAddress(address);
+        order.setPhone(phone);
+        order.setPincode(pincode);
+        order.setStatus("PLACED");
+        order.setOrderDateTime(LocalDateTime.now());
+        orderRepo.save(order);
+
+        for (CartItem c : cartItems) {
+            orderItemRepo.save(
+                    new OrderItem(
+                            c.getFruitName(),
+                            c.getPrice(),
+                            c.getQuantity(),
+                            order
+                    )
+            );
+        }
+
+        cartRepo.deleteAll(cartItems);
+        return "redirect:/profile?msg=Order placed successfully";
+    }
+
+    /* ================= PROFILE ================= */
+
+    @GetMapping("/profile")
+    public String profile(Model model, HttpSession session) {
+
+        User user = (User) session.getAttribute("loggedUser");
+        if (user == null) return "redirect:/login";
+
+        model.addAttribute("user", user);
+        model.addAttribute("orders",
+                orderRepo.findByUserOrderByOrderDateTimeDesc(user));
+
+        return "profile";
+    }
+
+    @GetMapping("/order/delete/{id}")
+    public String deleteOrder(@PathVariable Long id, HttpSession session) {
+
+        User user = (User) session.getAttribute("loggedUser");
+        if (user == null) return "redirect:/login";
+
+        Order order = orderRepo.findById(id).orElse(null);
+        if (order != null && order.getUser().getId().equals(user.getId())) {
+            orderRepo.delete(order);
+        }
+
+        return "redirect:/profile?msg=Order deleted";
+    }
+
+    @GetMapping("/orders/clear")
+    public String clearOrders(HttpSession session) {
+
+        User user = (User) session.getAttribute("loggedUser");
+        if (user != null) {
+            orderRepo.deleteAll(orderRepo.findByUser(user));
+        }
+
+        return "redirect:/profile?msg=Order history cleared";
     }
 
     /* ================= LOGOUT ================= */
+
     @GetMapping("/logout")
     public String logout(HttpSession session) {
         session.invalidate();
         return "redirect:/login";
     }
 
-    /* ================= TEMP FRUITS ================= */
-    private List<Map<String, Object>> getFruits() {
+    /* ================= PRODUCTS ================= */
 
-        List<Map<String, Object>> fruits = new ArrayList<>();
-
-        fruits.add(fruit("Apple", 180, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg"));
-        fruits.add(fruit("Banana", 60, "Dozen",
-                "https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg"));
-        fruits.add(fruit("Mango", 250, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/9/90/Hapus_Mango.jpg"));
-        fruits.add(fruit("Orange", 120, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/c/c4/Orange-Fruit-Pieces.jpg"));
-        fruits.add(fruit("Grapes", 90, "500g",
-                "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_grapes.jpg"));
-        fruits.add(fruit("Pineapple", 80, "Piece",
-                "https://upload.wikimedia.org/wikipedia/commons/c/cb/Pineapple_and_cross_section.jpg"));
-        fruits.add(fruit("Strawberry", 150, "250g",
-                "https://upload.wikimedia.org/wikipedia/commons/2/29/PerfectStrawberry.jpg"));
-        fruits.add(fruit("Watermelon", 40, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/e/ee/Watermelon_cross_BNC.jpg"));
-        fruits.add(fruit("Papaya", 50, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/8/8b/Papaya_cross_section.jpg"));
-        fruits.add(fruit("Kiwi", 200, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/d/d3/Kiwi_aka.jpg"));
-        fruits.add(fruit("Pomegranate", 220, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/6/6a/Pomegranate_fruit.jpg"));
-        fruits.add(fruit("Guava", 70, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/1/1c/Guava_ID.jpg"));
-        fruits.add(fruit("Cherry", 300, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/b/bb/Cherry_Stella444.jpg"));
-        fruits.add(fruit("Peach", 180, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/9/9e/Autumn_Red_peaches.jpg"));
-        fruits.add(fruit("Plum", 190, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/4/4e/Plums.jpg"));
-        fruits.add(fruit("Pear", 160, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/1/1b/Pear_DS.jpg"));
-        fruits.add(fruit("Lemon", 90, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/c/c0/Lemon.jpg"));
-        fruits.add(fruit("Lychee", 220, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/6/6a/Litchi_chinensis.jpg"));
-        fruits.add(fruit("Blueberry", 350, "250g",
-                "https://upload.wikimedia.org/wikipedia/commons/1/12/Blueberries.jpg"));
-        fruits.add(fruit("Avocado", 280, "Kg",
-                "https://upload.wikimedia.org/wikipedia/commons/c/c0/Avocado_Hass_-_single.jpg"));
-
-        return fruits;
+    private List<Map<String, Object>> fruits() {
+        return List.of(
+            fruit("Apple",180,"Kg","https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg"),
+            fruit("Banana",60,"Dozen","https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg"),
+            fruit("Mango",250,"Kg","https://upload.wikimedia.org/wikipedia/commons/9/90/Hapus_Mango.jpg"),
+            fruit("Orange",120,"Kg","https://upload.wikimedia.org/wikipedia/commons/c/c4/Orange-Fruit-Pieces.jpg"),
+            fruit("Pineapple",200,"Kg","https://upload.wikimedia.org/wikipedia/commons/c/cb/Pineapple_and_cross_section.jpg"),
+            fruit("Grapes",150,"Kg","https://upload.wikimedia.org/wikipedia/commons/1/11/Table_grapes_on_white.jpg"),
+            fruit("Watermelon",40,"Kg","https://upload.wikimedia.org/wikipedia/commons/e/ee/Watermelon_cross_BNC.jpg"),
+            fruit("Papaya",90,"Kg","https://upload.wikimedia.org/wikipedia/commons/9/9e/Papaya.jpg"),
+            fruit("Strawberry",300,"Kg","https://upload.wikimedia.org/wikipedia/commons/2/29/PerfectStrawberry.jpg"),
+            fruit("Kiwi",400,"Kg","https://upload.wikimedia.org/wikipedia/commons/d/d3/Kiwi_aka.jpg"),
+            fruit("Pomegranate",220,"Kg","https://upload.wikimedia.org/wikipedia/commons/9/9b/PomegranateFruit.jpg"),
+            fruit("Guava",80,"Kg","https://upload.wikimedia.org/wikipedia/commons/0/02/Guava_ID.jpg"),
+            fruit("Chikoo",120,"Kg","https://upload.wikimedia.org/wikipedia/commons/7/76/Sapodilla.jpg"),
+            fruit("Custard Apple",180,"Kg","https://upload.wikimedia.org/wikipedia/commons/e/e8/Sugar_apple.jpg"),
+            fruit("Peach",260,"Kg","https://upload.wikimedia.org/wikipedia/commons/9/9f/Nectarine_and_cross_section02_edit.jpg"),
+            fruit("Plum",240,"Kg","https://upload.wikimedia.org/wikipedia/commons/2/2c/Plums.jpg"),
+            fruit("Cherry",600,"Kg","https://upload.wikimedia.org/wikipedia/commons/b/bb/Cherry_Stella444.jpg"),
+            fruit("Blueberry",700,"Kg","https://upload.wikimedia.org/wikipedia/commons/1/12/Blueberries.jpg"),
+            fruit("Avocado",350,"Kg","https://upload.wikimedia.org/wikipedia/commons/c/c4/Avocado.jpg"),
+            fruit("Litchi",280,"Kg","https://upload.wikimedia.org/wikipedia/commons/4/4c/Lychee_fruit.jpg")
+        );
     }
 
-    private Map<String, Object> fruit(String name, int price, String unit, String image) {
-        Map<String, Object> f = new HashMap<>();
-        f.put("name", name);
-        f.put("price", price);
-        f.put("unit", unit);
-        f.put("image", image);
-        return f;
+    private Map<String, Object> fruit(String n, int p, String u, String i) {
+        return Map.of("name", n, "price", p, "unit", u, "image", i);
     }
 }

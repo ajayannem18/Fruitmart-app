@@ -1,113 +1,133 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>FruitMart Dashboard</title>
+    <title>FruitMart</title>
     <meta charset="UTF-8">
 
     <style>
         body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #eef8ee;
+            margin:0;
+            font-family:Arial, sans-serif;
+            background:#eef8ee;
         }
 
         /* ===== HEADER ===== */
         .header {
-            background: #2ecc71;
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header .logo {
-            font-size: 22px;
-            font-weight: bold;
+            background:#2ecc71;
+            color:white;
+            padding:15px 30px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
         }
 
         .header a {
-            color: white;
-            margin-left: 18px;
-            text-decoration: none;
-            font-weight: bold;
+            color:white;
+            text-decoration:none;
+            font-weight:bold;
+            margin-left:10px;
         }
 
-        /* ===== SEARCH ===== */
-        .search-box {
-            margin: 30px auto;
-            text-align: center;
+        /* ===== FILTER BAR ===== */
+        .filters {
+            background:white;
+            padding:15px 30px;
+            display:flex;
+            gap:15px;
+            align-items:center;
+            box-shadow:0 4px 10px rgba(0,0,0,.08);
         }
 
-        .search-box input {
-            width: 280px;
-            padding: 10px;
-            border-radius: 20px;
-            border: 1px solid #ccc;
-            outline: none;
+        .filters input {
+            padding:8px 10px;
+            border-radius:6px;
+            border:1px solid #ccc;
+            width:160px;
         }
 
-        .search-box button {
-            padding: 10px 18px;
-            border-radius: 20px;
-            border: none;
-            background: #27ae60;
-            color: white;
-            cursor: pointer;
-            margin-left: 8px;
+        .filters button {
+            background:#2ecc71;
+            color:white;
+            border:none;
+            padding:9px 18px;
+            border-radius:6px;
+            cursor:pointer;
         }
 
-        /* ===== FRUITS GRID ===== */
+        /* ===== PRODUCT GRID ===== */
         .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 25px;
-            padding: 20px 40px 60px;
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+            gap:30px;
+            padding:40px;
         }
 
-        .card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
-            padding: 15px;
-            text-align: center;
-            transition: transform 0.2s;
+        /* ===== PRODUCT CARD ===== */
+        .product-card {
+            background:white;
+            border-radius:18px;
+            box-shadow:0 8px 18px rgba(0,0,0,.15);
+            padding:20px;
+            text-align:center;
+            transition:transform .3s ease, box-shadow .3s ease;
         }
 
-        .card:hover {
-            transform: translateY(-6px);
+        .product-card:hover {
+            transform:translateY(-10px) scale(1.03);
+            box-shadow:0 15px 35px rgba(0,0,0,.18);
         }
 
-        .card img {
-            width: 140px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 10px;
+        .product-card img {
+            height:110px;
+            object-fit:contain;
+            margin-bottom:10px;
         }
 
-        .card h3 {
-            margin: 10px 0 5px;
-            color: #2c3e50;
+        .qty-box {
+            display:flex;
+            justify-content:center;
+            gap:18px;
+            margin:15px 0;
         }
 
-        .price {
-            color: #27ae60;
-            font-weight: bold;
-            margin-bottom: 10px;
+        .qty-btn {
+            width:36px;
+            height:36px;
+            border-radius:50%;
+            border:none;
+            background:#2ecc71;
+            color:white;
+            font-size:20px;
+            cursor:pointer;
         }
 
-        .card form button {
-            background: #2ecc71;
-            border: none;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
+        .amount {
+            font-weight:bold;
+            margin:8px 0;
         }
 
-        .card form button:hover {
-            background: #27ae60;
+        .error {
+            color:red;
+            font-size:13px;
+            display:none;
+            animation:shake .3s;
+        }
+
+        @keyframes shake {
+            0% { transform:translateX(0); }
+            25% { transform:translateX(-5px); }
+            50% { transform:translateX(5px); }
+            75% { transform:translateX(-5px); }
+            100% { transform:translateX(0); }
+        }
+
+        .add-btn {
+            background:#27ae60;
+            color:white;
+            border:none;
+            padding:10px 26px;
+            border-radius:22px;
+            cursor:pointer;
         }
     </style>
 </head>
@@ -116,47 +136,100 @@
 
 <!-- ===== HEADER ===== -->
 <div class="header">
-    <div class="logo">🍎 FruitMart</div>
-
+    <div>🍎 <b>FruitMart</b></div>
     <div>
-        <span th:if="${user != null}">
-            Hi, <b th:text="${user.name}">User</b>
-        </span>
-
-        <a href="/cart">🛒 Cart</a>
-        <a href="/orders">📦 Orders</a>
-        <a href="/logout">🚪 Logout</a>
+        👋 Hi <b th:text="${username}">User</b> |
+        <a href="/profile">Profile</a> |
+        <a href="/cart">🛒 <span th:text="${cartCount}">0</span></a> |
+        <a href="/logout">Logout</a>
     </div>
 </div>
 
-<!-- ===== SEARCH ===== -->
-<div class="search-box">
-    <form method="get" action="/dashboard">
-        <input type="text" name="search" placeholder="Search fruit name...">
-        <button type="submit">Search</button>
-    </form>
-</div>
+<!-- ===== SEARCH & FILTER ===== -->
+<form class="filters" method="get" action="/dashboard">
+    <input type="text" name="search" placeholder="Search fruit..."
+           th:value="${search}">
+    <input type="number" name="min" placeholder="Min ₹"
+           th:value="${min}">
+    <input type="number" name="max" placeholder="Max ₹"
+           th:value="${max}">
+    <button type="submit">Apply</button>
+</form>
 
-<!-- ===== FRUITS ===== -->
+<!-- ===== PRODUCTS ===== -->
 <div class="grid">
+    <div class="product-card"
+         th:each="fruit : ${fruits}"
+         th:data-name="${fruit.name}"
+         th:data-price="${fruit.price}">
 
-    <div class="card" th:each="fruit : ${fruits}">
-        <!-- IMPORTANT: MAP ACCESS -->
-        <img th:src="${fruit['image']}" alt="Fruit Image">
+        <img th:src="${fruit.image}">
+        <h3 th:text="${fruit.name}"></h3>
 
-        <h3 th:text="${fruit['name']}">Fruit</h3>
+        <p>
+            ₹<span th:text="${fruit.price}"></span> /
+            <span th:text="${fruit.unit}"></span>
+        </p>
 
-        <div class="price">
-            ₹<span th:text="${fruit['price']}">0</span> /
-            <span th:text="${fruit['unit']}">Kg</span>
+        <div class="qty-box">
+            <button class="qty-btn dec">−</button>
+            <span class="qty">0</span>
+            <button class="qty-btn inc">+</button>
         </div>
 
-        <form method="post" action="/add-to-cart">
-            <button type="submit">Add to Cart</button>
-        </form>
-    </div>
+        <div class="amount">₹0</div>
+        <div class="error">Please select quantity</div>
 
+        <button class="add-btn">Add to Cart</button>
+    </div>
 </div>
+
+<!-- ===== SCRIPT ===== -->
+<script>
+document.querySelectorAll(".product-card").forEach(card => {
+
+    let qty = 0;
+    const price = parseInt(card.dataset.price);
+    const name = card.dataset.name;
+
+    const qtySpan = card.querySelector(".qty");
+    const amountDiv = card.querySelector(".amount");
+    const error = card.querySelector(".error");
+
+    card.querySelector(".inc").onclick = () => {
+        qty++;
+        update();
+    };
+
+    card.querySelector(".dec").onclick = () => {
+        if (qty > 0) qty--;
+        update();
+    };
+
+    card.querySelector(".add-btn").onclick = () => {
+        if (qty === 0) {
+            error.style.display = "block";
+            setTimeout(() => error.style.display = "none", 1200);
+            return;
+        }
+
+        fetch(`/add-to-cart?name=${encodeURIComponent(name)}&qty=${qty}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d.redirect) {
+                    window.location.href = d.redirect;
+                } else {
+                    window.location.reload();
+                }
+            });
+    };
+
+    function update() {
+        qtySpan.innerText = qty;
+        amountDiv.innerText = "₹" + (qty * price);
+    }
+});
+</script>
 
 </body>
 </html>
